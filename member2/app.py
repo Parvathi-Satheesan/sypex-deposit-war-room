@@ -7,6 +7,15 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
 st.set_page_config(page_title="Deposit War Room - ODR Platform", layout="wide", page_icon="⚖️")
+st.markdown("""
+    <style>
+        [data-testid="stSidebarNav"] {display: none;}
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        .stDeployButton {display:none;}
+        div[data-testid="stToolbar"] {visibility: hidden; display: none;}
+    </style>
+""", unsafe_allow_html=True)
 
 # =========================================================
 # SESSION STATE INITIALIZATION
