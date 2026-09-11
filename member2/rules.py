@@ -12,9 +12,10 @@ from datetime import datetime
 class Claim:
     description: str
     amount: float
-    category: str = "other"          # unpaid_rent | utility | damage | painting | cleaning | other
+    category: str = "other"          # unpaid_rent | utility | damage | painting | cleaning | fixtures | other
     has_evidence: bool = False
     evidence_notes: str = ""
+    age_years: float = 0.0           # Required for fixtures 10% annual depreciation rule
 
 
 @dataclass
@@ -43,6 +44,22 @@ def _is_wear_and_tear(description: str, category: str, stayed_months: int) -> bo
         if "paint" in desc and "damage" not in desc:
             return True
     return False
+
+
+def check_settlement_gap(landlord_offer: float, tenant_offer: float, total_deposit: float) -> Dict[str, Any]:
+    """
+    Checks if parties are within the <= 5% gap threshold for auto-generating the settlement PDF.
+    """
+    gap = abs(landlord_offer - tenant_offer)
+    gap_percentage = (gap / total_deposit) * 100 if total_deposit > 0 else 0.0
+    can_auto_settle = gap_percentage <= 5.0
+
+    return {
+        "gap": gap,
+        "gap_percentage": round(gap_percentage, 2),
+        "can_auto_settle": can_auto_settle,
+        "agreed_amount": round((landlord_offer + tenant_offer) / 2, 2) if can_auto_settle else None
+    }
 
 
 def evaluate_tenancy_dispute(
@@ -86,6 +103,8 @@ def evaluate_tenancy_dispute(
                 cat = "painting"
             elif "clean" in low:
                 cat = "cleaning"
+            elif any(k in low for k in ["fan", "light", "fixture", "appliance", "geyser", "cabinet"]):
+                cat = "fixtures"
             elif any(k in low for k in ["damage", "break", "hole", "crack", "missing"]):
                 cat = "damage"
             claims.append(Claim(description=desc, amount=float(amount), category=cat, has_evidence=False))
@@ -98,7 +117,22 @@ def evaluate_tenancy_dispute(
 
         if claim.category in ("unpaid_rent", "utility"):
             valid[claim.description] = amount
-            logs.append(f"✅ '{claim.description}' (₹{amount:,.0f}) approved as unpaid dues.")
+            logs.append(f"✅ '{claim.description}' (₹{amount:,.0f}) approved as unpaid contractual dues.")
+            continue
+
+        # Fixture 10% annual depreciation cap rule
+        if claim.category == "fixtures":
+            if claim.has_evidence or claim.age_years > 0:
+                depreciation_rate = min(1.0, 0.10 * claim.age_years)
+                depreciated_amount = amount * (1.0 - depreciation_rate)
+                valid[claim.description] = depreciated_amount
+                logs.append(
+                    f"✅ '{claim.description}' approved at ₹{depreciated_amount:,.0f} "
+                    f"(Applied 10%/yr depreciation for {claim.age_years} year(s) age)."
+                )
+            else:
+                rejected[claim.description] = amount
+                logs.append(f"❌ '{claim.description}' (₹{amount:,.0f}) rejected pending evidence.")
             continue
 
         if claim.category in ("painting", "cleaning") or _is_wear_and_tear(
