@@ -1,126 +1,130 @@
 import io
+import datetime
 import streamlit as st
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-st.set_page_config(page_title="The Deposit War Room - ODR Platform", layout="wide")
+st.set_page_config(page_title="Deposit War Room - ODR Platform", layout="wide", page_icon="⚖️")
 
-# --- Initialize Persistent Session State ---
+# =========================================================
+# SESSION STATE INITIALIZATION
+# =========================================================
 if "page" not in st.session_state:
     st.session_state.page = "home"
-if "tenant_done" not in st.session_state:
-    st.session_state.tenant_done = False
-if "landlord_done" not in st.session_state:
-    st.session_state.landlord_done = False
+if "tenant_submitted" not in st.session_state:
+    st.session_state.tenant_submitted = False
+if "landlord_submitted" not in st.session_state:
+    st.session_state.landlord_submitted = False
 
-def go_to(page_name):
+# Negotiation Round Tracking
+if "negotiation_rounds" not in st.session_state:
+    st.session_state.negotiation_rounds = []
+if "tenant_consent" not in st.session_state:
+    st.session_state.tenant_consent = False
+if "landlord_consent" not in st.session_state:
+    st.session_state.landlord_consent = False
+
+def navigate_to(page_name):
     st.session_state.page = page_name
     st.rerun()
 
-# --- Function to Generate Styled PDF Buffer ---
-def generate_pdf_bytes(tenant_name, landlord_name, address, rent, deposit, duration, 
-                       painting_claim, allow_painting, fixture_claim, fixture_age, 
-                       utility_claim, approved_deductions, final_refund, logs):
+# =========================================================
+# PDF GENERATOR ENGINE (REPORTLAB)
+# =========================================================
+def generate_settlement_pdf(tenant_name, landlord_name, address, rent, deposit, duration,
+                            painting_claim, allow_painting, fixture_claim, fixture_age,
+                            utility_claim, approved_deductions, final_refund, logs,
+                            agreed_amount, tenant_consent, landlord_consent):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=36,
-        leftMargin=36,
-        topMargin=36,
-        bottomMargin=36
+        buffer, pagesize=letter,
+        rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36
     )
     
     styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1E293B'))
-    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#64748B'))
-    section_heading = ParagraphStyle('SecHeading', parent=styles['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#0F172A'), spaceBefore=10, spaceAfter=6)
-    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#334155'))
+    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1E293B'))
+    subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#64748B'))
+    sec_heading = ParagraphStyle('SecHeading', parent=styles['Heading2'], fontSize=11, leading=15, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4)
+    body_style = ParagraphStyle('DocBody', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#334155'))
     bold_body = ParagraphStyle('BoldBody', parent=body_style, fontName='Helvetica-Bold')
 
     elements = []
 
-    # Title Banner
+    # Title Header
     elements.append(Paragraph("BINDING SETTLEMENT AGREEMENT", title_style))
     elements.append(Paragraph("Online Dispute Resolution Platform for Residential Tenancy Deposits", subtitle_style))
-    elements.append(Paragraph("Under the Karnataka Rent Act, 1999 (as amended) & contractual principles", subtitle_style))
-    elements.append(Paragraph("<b>Case ID:</b> ODR-2026-BLR-001", subtitle_style))
+    elements.append(Paragraph("Evaluated under Karnataka Rent Control Act Provisions & Contractual Statutory Principles", subtitle_style))
+    elements.append(Paragraph(f"<b>Case ID:</b> ODR-2026-BLR-{datetime.datetime.now().strftime('%M%S')}", subtitle_style))
     elements.append(Spacer(1, 10))
 
     # 1. Parties & Property
-    elements.append(Paragraph("1. Parties & Property", section_heading))
+    elements.append(Paragraph("1. Parties & Property Information", sec_heading))
     p_text = f"<b>Landlord:</b> {landlord_name} | <b>Tenant:</b> {tenant_name}<br/>" \
-             f"<b>Property:</b> {address}<br/>" \
-             f"<b>Monthly Rent:</b> ₹{rent:,.0f} | <b>Occupation:</b> {duration} months"
+             f"<b>Property Address:</b> {address}<br/>" \
+             f"<b>Monthly Rent:</b> ₹{rent:,.2f} | <b>Tenancy Duration:</b> {duration} Months"
     elements.append(Paragraph(p_text, body_style))
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
 
-    # 2. Financial Summary Table
-    elements.append(Paragraph("2. Financial Summary", section_heading))
+    # 2. Financial Summary
+    elements.append(Paragraph("2. Financial Summary & Statutory Calculations", sec_heading))
     fin_data = [
         [Paragraph("<b>Description</b>", bold_body), Paragraph("<b>Amount (₹)</b>", bold_body)],
-        ["Initial Security Deposit Held", f"₹{deposit:,.0f}"],
-        ["Total Approved Deductions", f"₹{approved_deductions:,.0f}"],
-        [Paragraph("<b>FINAL REFUND DUE TO TENANT</b>", bold_body), Paragraph(f"<b>₹{final_refund:,.0f}</b>", bold_body)]
+        ["Initial Security Deposit Paid", f"₹{deposit:,.2f}"],
+        ["Total Statutory Deductions Approved", f"₹{approved_deductions:,.2f}"],
+        ["Statutory Net Refund Calculated", f"₹{final_refund:,.2f}"],
+        [Paragraph("<b>FINAL MUTUALLY AGREED REFUND AMOUNT</b>", bold_body), Paragraph(f"<b>₹{agreed_amount:,.2f}</b>", bold_body)]
     ]
     t_fin = Table(fin_data, colWidths=[380, 160])
     t_fin.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#0F172A')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-        ('PADDING', (0,0), (-1,-1), 6),
-        ('BACKGROUND', (0,3), (-1,3), colors.HexColor('#E2E8F0'))
+        ('PADDING', (0,0), (-1,-1), 5),
+        ('BACKGROUND', (0,4), (-1,4), colors.HexColor('#DCFCE7'))
     ]))
     elements.append(t_fin)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
 
-    # 3. Itemised Deduction Decisions Table
-    elements.append(Paragraph("3. Itemised Deduction Decisions", section_heading))
-    
-    p_status = "APPROVED" if allow_painting else "REJECTED"
+    # 3. Itemized Deductions Decisions
+    elements.append(Paragraph("3. Itemized Damage & Deduction Assessment", sec_heading))
+    p_status = "APPROVED" if allow_painting else "REJECTED (Normal Wear & Tear)"
     deprec_val = max(0.0, fixture_claim * (1 - (0.10 * fixture_age)))
     
     item_data = [
-        [Paragraph("<b>Claim</b>", bold_body), Paragraph("<b>Amount (₹)</b>", bold_body), Paragraph("<b>Decision</b>", bold_body)],
-        ["Painting Charges", f"₹{painting_claim:,.0f}", p_status],
-        ["Fixture / Appliance Damage", f"₹{deprec_val:,.0f}", "APPROVED (Depreciated)"],
-        ["Unpaid Electricity / Utility Bill", f"₹{utility_claim:,.0f}", "APPROVED"]
+        [Paragraph("<b>Claim Type</b>", bold_body), Paragraph("<b>Claimed Amount</b>", bold_body), Paragraph("<b>Statutory Decision / Approved</b>", bold_body)],
+        ["Painting & Maintenance", f"₹{painting_claim:,.2f}", f"{p_status}"],
+        ["Fixture Damage", f"₹{fixture_claim:,.2f}", f"₹{deprec_val:,.2f} (10%/yr Deprecated)"],
+        ["Utility Arrears & Unpaid Bills", f"₹{utility_claim:,.2f}", f"₹{utility_claim:,.2f} (APPROVED)"]
     ]
-    t_item = Table(item_data, colWidths=[240, 140, 160])
+    t_item = Table(item_data, colWidths=[200, 140, 200])
     t_item.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
         ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-        ('PADDING', (0,0), (-1,-1), 6)
+        ('PADDING', (0,0), (-1,-1), 5)
     ]))
     elements.append(t_item)
-    elements.append(Spacer(1, 10))
+    elements.append(Spacer(1, 8))
 
-    # 4. Rules Engine Decision Log
-    elements.append(Paragraph("4. Rules Engine Decision Log", section_heading))
+    # 4. Decision Engine Audit Log
+    elements.append(Paragraph("4. Rules Engine Audit Log", sec_heading))
     for log in logs:
         elements.append(Paragraph(f"• {log}", body_style))
     elements.append(Spacer(1, 10))
 
-    # 5. Warnings / Notes
-    if deposit > (2 * rent) and rent > 0:
-        elements.append(Paragraph("5. Warnings / Notes", section_heading))
-        warn_msg = f"• Collected deposit ₹{deposit:,.0f} exceeds the commonly cited 2-month residential guidance (₹{2*rent:,.0f}). Excess ₹{deposit - (2*rent):,.0f} is noted for transparency only."
-        elements.append(Paragraph(warn_msg, body_style))
-        elements.append(Spacer(1, 10))
-
-    # 6. Binding Effect & Signatures
-    elements.append(Paragraph("6. Binding Effect", section_heading))
-    binding_text = "This document records the outcome of the Online Dispute Resolution process for the security deposit under the tenancy between the parties named above. Both parties acknowledge that the Final Refund figure stated herein constitutes a full and final settlement of all claims relating to the security deposit for the said premises."
+    # 5. Signatures & Digital Consent
+    elements.append(Paragraph("5. Digital Consent & Binding Effect", sec_heading))
+    binding_text = "This document records the final outcome of the ODR process. Both parties explicitly confirm that the agreed refund amount constitutes full and final settlement of all deposit claims."
     elements.append(Paragraph(binding_text, body_style))
-    elements.append(Spacer(1, 15))
+    elements.append(Spacer(1, 10))
+
+    t_status = "DIGITALLY SIGNED & CONSENTED" if tenant_consent else "PENDING SIGNATURE"
+    l_status = "DIGITALLY SIGNED & CONSENTED" if landlord_consent else "PENDING SIGNATURE"
 
     sig_data = [
-        [Paragraph("<b>Landlord Acceptance</b>", bold_body), Paragraph("<b>Tenant Acceptance</b>", bold_body)],
-        ["Signature/Digital Acceptance:\n\n_______________________", "Signature/Digital Acceptance:\n\n_______________________"],
-        ["Date:", "Date:"]
+        [Paragraph("<b>Landlord Digital Acceptance</b>", bold_body), Paragraph("<b>Tenant Digital Acceptance</b>", bold_body)],
+        [f"Status: {l_status}\nLandlord: {landlord_name}", f"Status: {t_status}\nTenant: {tenant_name}"],
+        [f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"]
     ]
     t_sig = Table(sig_data, colWidths=[270, 270])
     t_sig.setStyle(TableStyle([
@@ -134,111 +138,118 @@ def generate_pdf_bytes(tenant_name, landlord_name, address, rent, deposit, durat
     return buffer
 
 # =========================================================
-# PAGE 1: LANDING / ROLE SELECTION
+# STAGE 1 & 2: LANDING & INTAKE PORTALS
 # =========================================================
 if st.session_state.page == "home":
-    st.title("⚖️ The Deposit War Room")
-    st.caption("Online Dispute Resolution Platform under Karnataka Rent Act")
+    st.title("⚖️ Deposit War Room — ODR Platform")
+    st.caption("Automated Dispute Resolution Engine compliant with the Karnataka Rent Control Act")
     st.divider()
 
-    st.subheader("Select portal to begin dispute resolution:")
-    col1, col2 = st.columns(2)
+    st.subheader("Select Interface Portal to Begin Dispute Resolution:")
+    c1, c2 = st.columns(2)
 
-    with col1:
-        st.info("### 👤 Start as Tenant")
-        st.write("Submit tenancy agreement details, security deposit paid, and requested refund amount.")
-        if st.session_state.tenant_done:
-            st.success("✅ Tenant details already submitted!")
-        if st.button("Start Tenant Intake", type="primary", use_container_width=True):
-            go_to("tenant")
+    with c1:
+        st.info("### 👤 Tenant Interface")
+        st.write("Submit tenancy parameters, deposit details, notice history, and requested refund.")
+        if st.session_state.tenant_submitted:
+            st.success("✅ Tenant Data Submitted")
+        if st.button("Enter Tenant Portal", type="primary", use_container_width=True):
+            navigate_to("tenant")
 
-    with col2:
-        st.warning("### 🏠 Start as Landlord")
-        st.write("Itemize property damage deductions, utility arrears, and submit initial refund offer.")
-        if st.session_state.landlord_done:
-            st.success("✅ Landlord details already submitted!")
-        if st.button("Start Landlord Claims", type="primary", use_container_width=True):
-            go_to("landlord")
+    with c2:
+        st.warning("### 🏠 Landlord Interface")
+        st.write("Itemize property damage claims, upload evidence receipts, and record utility arrears.")
+        if st.session_state.landlord_submitted:
+            st.success("✅ Landlord Data Submitted")
+        if st.button("Enter Landlord Portal", type="primary", use_container_width=True):
+            navigate_to("landlord")
 
-# =========================================================
-# PAGE 2: TENANT PORTAL
-# =========================================================
+    st.divider()
+    if st.session_state.tenant_submitted and st.session_state.landlord_submitted:
+        st.success("🎉 Both parties have submitted data! You can proceed to statutory calculation & negotiation.")
+        if st.button("Proceed to Engine & Negotiation Room →", type="primary", use_container_width=True):
+            navigate_to("settlement")
+
 elif st.session_state.page == "tenant":
-    if st.button("← Back to Home"):
-        go_to("home")
-    
-    st.title("👤 Tenant Intake Portal")
-    st.caption("Submit tenancy parameters and review statutory protections under Karnataka Rent Act.")
+    if st.button("← Back to Landing"):
+        navigate_to("home")
+    st.title("👤 Stage 1 & 2: Tenant Intake & Evidence Portal")
     st.divider()
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("1. Tenancy Intake Information")
-        st.session_state.tenant_name = st.text_input("Tenant Name", value=st.session_state.get("tenant_name", ""))
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("1. Tenancy Identification")
+        st.session_state.tenant_name = st.text_input("Tenant Full Name", value=st.session_state.get("tenant_name", ""))
         st.session_state.address = st.text_input("Property Address", value=st.session_state.get("address", ""))
-        st.session_state.duration = st.number_input("Tenancy Duration (Months)", value=st.session_state.get("duration", 0), min_value=0)
-    with col2:
-        st.subheader("Financial Details")
-        st.session_state.rent = st.number_input("Monthly Rent (₹)", value=st.session_state.get("rent", 0), min_value=0)
-        st.session_state.deposit = st.number_input("Security Deposit Held (₹)", value=st.session_state.get("deposit", 0), min_value=0)
-        st.session_state.requested_refund = st.number_input("Requested Deposit Refund (₹)", value=st.session_state.get("requested_refund", 0), min_value=0)
+        st.session_state.duration = st.number_input("Tenancy Duration (Months)", min_value=0, value=st.session_state.get("duration", 0))
 
-    if st.button("Save Tenant Data & Proceed →", type="primary"):
-        st.session_state.tenant_done = True
-        if not st.session_state.landlord_done:
-            go_to("landlord")
-        else:
-            go_to("settlement")
+    with c2:
+        st.subheader("2. Financial & Notice Details")
+        st.session_state.rent = st.number_input("Monthly Rent (₹)", min_value=0, value=st.session_state.get("rent", 0))
+        st.session_state.deposit = st.number_input("Security Deposit Paid (₹)", min_value=0, value=st.session_state.get("deposit", 0))
+        st.session_state.requested_refund = st.number_input("Requested Refund Amount (₹)", min_value=0, value=st.session_state.get("requested_refund", 0))
 
-# =========================================================
-# PAGE 3: LANDLORD PORTAL
-# =========================================================
+    st.subheader("3. Evidence Upload & Notice History")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.session_state.notice_given = st.checkbox("Gave minimum 1-Month Move-Out Notice?", value=st.session_state.get("notice_given", True))
+        st.session_state.tenant_agreement_file = st.file_uploader("Upload Rent Agreement (PDF/Image)", type=["pdf", "png", "jpg"])
+    with col_b:
+        st.session_state.moveout_pics = st.file_uploader("Upload Move-Out Handover Photos", type=["png", "jpg"], accept_multiple_files=True)
+
+    if st.button("Save & Submit Tenant Profile", type="primary"):
+        st.session_state.tenant_submitted = True
+        st.success("Tenant information recorded.")
+        navigate_to("home")
+
 elif st.session_state.page == "landlord":
-    if st.button("← Back to Home"):
-        go_to("home")
-        
-    st.title("🏠 Landlord Claims Portal")
-    st.caption("Itemize property damage, maintenance claims, and official refund offers.")
+    if st.button("← Back to Landing"):
+        navigate_to("home")
+    st.title("🏠 Stage 1 & 2: Landlord Intake & Claims Portal")
     st.divider()
-    
-    st.session_state.landlord_name = st.text_input("Landlord Name", value=st.session_state.get("landlord_name", ""))
-    
-    st.subheader("2. Itemised Claims & Evidence Input")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.session_state.painting_claim = st.number_input("Painting Claim Amount (₹)", value=st.session_state.get("painting_claim", 0), min_value=0)
-        st.session_state.allow_painting = st.checkbox("Agreement explicitly allows painting deductions?", value=st.session_state.get("allow_painting", False))
-    with col2:
-        st.session_state.fixture_claim = st.number_input("Fixture Claim Amount (₹)", value=st.session_state.get("fixture_claim", 0), min_value=0)
-        st.session_state.fixture_age = st.number_input("Fixture Age (Years)", value=st.session_state.get("fixture_age", 0.0), min_value=0.0)
-    with col3:
-        st.session_state.utility_claim = st.number_input("Utility Arrears Amount (₹)", value=st.session_state.get("utility_claim", 0), min_value=0)
-        st.session_state.evidence_attached = st.checkbox("Evidence Provided?", value=st.session_state.get("evidence_attached", False))
 
-    st.session_state.landlord_offer = st.number_input("Landlord Refund Offer (₹)", value=st.session_state.get("landlord_offer", 0), min_value=0)
+    st.session_state.landlord_name = st.text_input("Landlord Full Name", value=st.session_state.get("landlord_name", ""))
+    
+    st.subheader("Structured Evidence Entry & Claims")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("#### 🎨 Painting Claim")
+        st.session_state.painting_claim = st.number_input("Painting Claim (₹)", min_value=0, value=st.session_state.get("painting_claim", 0))
+        st.session_state.allow_painting = st.checkbox("Agreement explicitly mandates tenant painting?", value=st.session_state.get("allow_painting", False))
+        st.file_uploader("Upload Painting Invoices/Photos", type=["pdf", "png", "jpg"], key="paint_file")
 
-    if st.button("Save Landlord Data & Proceed →", type="primary"):
-        st.session_state.landlord_done = True
-        if not st.session_state.tenant_done:
-            go_to("tenant")
-        else:
-            go_to("settlement")
+    with c2:
+        st.markdown("#### 💡 Fixture & Appliance Damage")
+        st.session_state.fixture_claim = st.number_input("Fixture Claim (₹)", min_value=0, value=st.session_state.get("fixture_claim", 0))
+        st.session_state.fixture_age = st.number_input("Age of Fixture (Years)", min_value=0.0, value=st.session_state.get("fixture_age", 0.0), step=0.5)
+        st.file_uploader("Upload Repair Estimates", type=["pdf", "png", "jpg"], key="fix_file")
+
+    with c3:
+        st.markdown("#### 🚰 Utility Arrears")
+        st.session_state.utility_claim = st.number_input("Unpaid Bills (₹)", min_value=0, value=st.session_state.get("utility_claim", 0))
+        st.file_uploader("Upload Utility Bills", type=["pdf", "png", "jpg"], key="util_file")
+
+    st.session_state.landlord_offer = st.number_input("Initial Landlord Refund Offer (₹)", min_value=0, value=st.session_state.get("landlord_offer", 0))
+
+    if st.button("Save & Submit Landlord Claims", type="primary"):
+        st.session_state.landlord_submitted = True
+        st.success("Landlord information recorded.")
+        navigate_to("home")
 
 # =========================================================
-# PAGE 4: JOINT SETTLEMENT & DECISION ENGINE
+# STAGE 3, 4 & 5: CALCULATIONS, NEGOTIATION & SETTLEMENT
 # =========================================================
 elif st.session_state.page == "settlement":
-    if st.button("← Edit Data / Back to Home"):
-        go_to("home")
+    if st.button("← Back to Landing / Edit Intake Data"):
+        navigate_to("home")
 
-    st.title("⚖️ Results & Decision Breakdown")
-    st.caption("Neutral ODR Engine evaluating submitted tenant and landlord data against statutory rules.")
+    st.title("⚖️ ODR Rules Engine & Negotiation War Room")
     st.divider()
 
-    # Retrieve Inputs
-    tenant_name = st.session_state.get("tenant_name", "N/A")
-    landlord_name = st.session_state.get("landlord_name", "N/A")
-    address = st.session_state.get("address", "N/A")
+    # Retrieve Values
+    t_name = st.session_state.get("tenant_name", "Tenant")
+    l_name = st.session_state.get("landlord_name", "Landlord")
+    addr = st.session_state.get("address", "N/A")
     duration = st.session_state.get("duration", 0)
     rent = st.session_state.get("rent", 0)
     deposit = st.session_state.get("deposit", 0)
@@ -247,88 +258,169 @@ elif st.session_state.page == "settlement":
     fixture_claim = st.session_state.get("fixture_claim", 0)
     fixture_age = st.session_state.get("fixture_age", 0.0)
     utility_claim = st.session_state.get("utility_claim", 0)
+    notice_given = st.session_state.get("notice_given", True)
+    
     landlord_offer = st.session_state.get("landlord_offer", 0)
     requested_refund = st.session_state.get("requested_refund", 0)
 
-    # Statutory Engine Logic
-    approved_deductions = 0
+    # ---------------------------------------------------------
+    # STAGE 3: AUTOMATED STATUTORY CALCULATION ENGINE
+    # ---------------------------------------------------------
+    st.subheader("STAGE 3: Automated Karnataka Rent Control Statutory Evaluation")
+    
+    approved_deductions = 0.0
     logs = []
 
-    guidance_cap = 2 * rent
-    if rent > 0 and deposit > guidance_cap:
-        excess = deposit - guidance_cap
-        logs.append(f"Soft warning: deposit exceeds 2x rent guidance by Rs. {excess:,.0f}.")
+    # Rule 1: 1-Month Notice Deduction Rule
+    if not notice_given and rent > 0:
+        approved_deductions += rent
+        logs.append(f"❌ Notice Shortfall penalty applied: ₹{rent:,.2f} deducted (1 month rent penalty for lack of move-out notice).")
+    else:
+        logs.append("✅ Notice Protection: 1-Month notice requirement satisfied.")
 
+    # Rule 2: Wear & Tear Prohibition vs Painting Clause
     if allow_painting:
         approved_deductions += painting_claim
-        logs.append(f"'Painting Charges' (Rs. {painting_claim:,.0f}) allowed agreement + evidence.")
+        logs.append(f"✅ Painting Deductions: Approved ₹{painting_claim:,.2f} based on explicit agreement clause.")
     else:
-        logs.append(f"'Painting Charges' (Rs. {painting_claim:,.0f}) rejected: normal wear & tear.")
+        logs.append(f"🛡️ Wear & Tear Protection: Painting claim of ₹{painting_claim:,.2f} REJECTED. Routine repainting post-tenancy is statutory normal wear & tear.")
 
+    # Rule 3: 10% Annual Fixture Depreciation Cap Rule
     depreciation_rate = 0.10
     depreciated_fixture = max(0.0, fixture_claim * (1 - (depreciation_rate * fixture_age)))
     approved_deductions += depreciated_fixture
-    logs.append(f"'Fixture Damage' approved at Rs. {depreciated_fixture:,.0f} (Applied 10%/yr depreciation for {fixture_age} year(s) age).")
+    logs.append(f"📉 Fixture Depreciation Rule: Claim of ₹{fixture_claim:,.2f} reduced to ₹{depreciated_fixture:,.2f} (Applied statutory 10%/yr depreciation cap for {fixture_age} year(s)).")
 
+    # Rule 4: Utility Dues
     approved_deductions += utility_claim
-    logs.append(f"'Unpaid Electricity Bill' (Rs. {utility_claim:,.0f}) approved as unpaid contractual dues.")
+    logs.append(f"✅ Utility Arrears: Approved ₹{utility_claim:,.2f} for unpaid contractual bills.")
 
-    final_statutory_refund = deposit - approved_deductions
+    # Net Statutory Calculations
+    final_statutory_refund = max(0.0, deposit - approved_deductions)
 
-    # Dashboard Metrics
     m1, m2, m3 = st.columns(3)
-    m1.metric("Initial Deposit", f"₹{deposit:,.0f}")
-    m2.metric("Approved Deductions", f"₹{approved_deductions:,.0f}")
-    m3.metric("Final Refund Due", f"₹{final_statutory_refund:,.0f}")
+    m1.metric("Initial Deposit", f"₹{deposit:,.2f}")
+    m2.metric("Total Approved Statutory Deductions", f"₹{approved_deductions:,.2f}")
+    m3.metric("Statutory Net Refund Due", f"₹{final_statutory_refund:,.2f}")
 
-    st.subheader("4. Rules Engine Decision Log")
-    for log in logs:
-        st.write(f"• {log}")
+    with st.expander("🔍 View Engine Rules & Statutory Audit Logs", expanded=True):
+        for log in logs:
+            st.write(log)
 
     st.divider()
 
-    st.subheader("5. Structured Negotiation")
-    c1, c2 = st.columns(2)
-    with c1:
-        offered = st.number_input("Landlord Refund Offer (₹)", value=float(landlord_offer))
-    with c2:
-        requested = st.number_input("Tenant Requested Refund (₹)", value=float(requested_refund))
+    # ---------------------------------------------------------
+    # STAGE 4: STRUCTURED NEGOTIATION (MAX 3 ROUNDS)
+    # ---------------------------------------------------------
+    st.subheader("STAGE 4: Multi-Round Structured Negotiation (Max 3 Rounds)")
 
-    gap = abs(requested - offered)
-    gap_percent = (gap / deposit) * 100 if deposit > 0 else 0
+    # Initialize Round 1 if empty
+    if len(st.session_state.negotiation_rounds) == 0:
+        st.session_state.negotiation_rounds.append({
+            "round": 1,
+            "tenant_req": float(requested_refund),
+            "landlord_off": float(landlord_offer)
+        })
 
-    st.info(f"Current Gap: ₹{gap:,.0f} ({gap_percent:.2f}% of total deposit)")
+    current_round_num = len(st.session_state.negotiation_rounds)
+    current_round_data = st.session_state.negotiation_rounds[-1]
 
-    if deposit > 0 and gap_percent <= 5:
-        st.success("🎉 Settlement Reached! Gap is within the ≤ 5% threshold.")
+    curr_tenant = current_round_data["tenant_req"]
+    curr_landlord = current_round_data["landlord_off"]
 
-        # Generate Styled PDF Buffer
-        pdf_buffer = generate_pdf_bytes(
-            tenant_name=tenant_name,
-            landlord_name=landlord_name,
-            address=address,
-            rent=rent,
-            deposit=deposit,
-            duration=duration,
-            painting_claim=painting_claim,
-            allow_painting=allow_painting,
-            fixture_claim=fixture_claim,
-            fixture_age=fixture_age,
-            utility_claim=utility_claim,
-            approved_deductions=approved_deductions,
-            final_refund=final_statutory_refund,
-            logs=logs
-        )
+    # Calculate Gap
+    gap = abs(curr_tenant - curr_landlord)
+    gap_percent = (gap / deposit * 100) if deposit > 0 else 0
 
-        st.download_button(
-            label="📄 Auto-Generate Binding Settlement PDF",
-            data=pdf_buffer,
-            file_name=f"Binding_Settlement_Agreement_{tenant_name if tenant_name else 'Document'}.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True
-        )
-    elif deposit == 0:
-        st.warning("Please enter tenancy parameters to calculate negotiation settlement.")
+    st.markdown(f"#### **Round {current_round_num} of 3 Analysis**")
+    
+    # Gap Visualizer Metric
+    col_g1, col_g2, col_g3 = st.columns(3)
+    col_g1.metric("Tenant Asking Refund", f"₹{curr_tenant:,.2f}")
+    col_g2.metric("Landlord Offered Refund", f"₹{curr_landlord:,.2f}")
+    col_g3.metric("Dispute Gap Amount", f"₹{gap:,.2f}", delta=f"{gap_percent:.2f}% of deposit", delta_color="inverse")
+
+    # Visual Progress Bar
+    st.write("**Dispute Settlement Gap Visualization:**")
+    st.progress(max(0.0, min(1.0, 1.0 - (gap_percent / 100))))
+
+    # Negotiation History Table
+    if len(st.session_state.negotiation_rounds) > 0:
+        st.write("**Negotiation Audit Trail:**")
+        st.table(st.session_state.negotiation_rounds)
+
+    # Allow counteroffers if under 3 rounds and gap > 5%
+    if gap_percent > 5.0 and current_round_num < 3:
+        st.warning(f"⚠️ Current Gap is {gap_percent:.2f}% (exceeds ≤ 5% threshold). Submit Round {current_round_num + 1} Counteroffer:")
+        
+        nc1, nc2 = st.columns(2)
+        with nc1:
+            new_t_req = st.number_input("New Tenant Request (₹)", value=curr_tenant, key=f"t_req_{current_round_num}")
+        with nc2:
+            new_l_off = st.number_input("New Landlord Offer (₹)", value=curr_landlord, key=f"l_off_{current_round_num}")
+
+        if st.button(f"Submit Round {current_round_num + 1} Counteroffer"):
+            st.session_state.negotiation_rounds.append({
+                "round": current_round_num + 1,
+                "tenant_req": new_t_req,
+                "landlord_off": new_l_off
+            })
+            st.rerun()
+
+    elif gap_percent > 5.0 and current_round_num >= 3:
+        st.error("❌ Maximum 3 Negotiation Rounds Exceeded without convergence. Case flagged for Formal Human Arbitrator / Small Claims Court referral.")
+
+    # ---------------------------------------------------------
+    # STAGE 5: SETTLEMENT & DIGITAL SIGNATURES
+    # ---------------------------------------------------------
+    st.divider()
+    st.subheader("STAGE 5: Binding Settlement & Document Execution")
+
+    if gap_percent <= 5.0:
+        st.success(f"🎉 Dispute Successfully Resolved! Settlement gap is within the allowable threshold ({gap_percent:.2f}% ≤ 5.0%).")
+        agreed_amount = (curr_tenant + curr_landlord) / 2.0
+        st.info(f"**Final Settled Refund Amount:** ₹{agreed_amount:,.2f}")
+
+        st.markdown("#### Digital Acceptance & Execution Signatures")
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            st.session_state.tenant_consent = st.checkbox(f"Digital Signature: Tenant ({t_name}) accepts ₹{agreed_amount:,.2f}")
+        with sc2:
+            st.session_state.landlord_consent = st.checkbox(f"Digital Signature: Landlord ({l_name}) accepts ₹{agreed_amount:,.2f}")
+
+        if st.session_state.tenant_consent and st.session_state.landlord_consent:
+            st.balloons()
+            
+            # Generate ReportLab PDF
+            pdf_bytes = generate_settlement_pdf(
+                tenant_name=t_name,
+                landlord_name=l_name,
+                address=addr,
+                rent=rent,
+                deposit=deposit,
+                duration=duration,
+                painting_claim=painting_claim,
+                allow_painting=allow_painting,
+                fixture_claim=fixture_claim,
+                fixture_age=fixture_age,
+                utility_claim=utility_claim,
+                approved_deductions=approved_deductions,
+                final_refund=final_statutory_refund,
+                logs=logs,
+                agreed_amount=agreed_amount,
+                tenant_consent=st.session_state.tenant_consent,
+                landlord_consent=st.session_state.landlord_consent
+            )
+
+            st.download_button(
+                label="📄 Download Binding Settlement Agreement (PDF)",
+                data=pdf_bytes,
+                file_name=f"Settlement_Agreement_{t_name}.pdf",
+                mime="application/pdf",
+                type="primary",
+                use_container_width=True
+            )
+        else:
+            st.warning("Both parties must check their respective digital consent boxes to unlock PDF generation.")
     else:
-        st.error("⚠️ Gap exceeds 5% threshold. Settlement negotiation recommended.")
+        st.info("Settlement agreement PDF generation will unlock once the dispute gap reaches ≤ 5%.")
