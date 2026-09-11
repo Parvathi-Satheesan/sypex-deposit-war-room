@@ -1,4 +1,9 @@
+import io
 import streamlit as st
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 st.set_page_config(page_title="The Deposit War Room - ODR Platform", layout="wide")
 
@@ -14,6 +19,120 @@ def go_to(page_name):
     st.session_state.page = page_name
     st.rerun()
 
+# --- Function to Generate Styled PDF Buffer ---
+def generate_pdf_bytes(tenant_name, landlord_name, address, rent, deposit, duration, 
+                       painting_claim, allow_painting, fixture_claim, fixture_age, 
+                       utility_claim, approved_deductions, final_refund, logs):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=36,
+        leftMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1E293B'))
+    subtitle_style = ParagraphStyle('SubTitleStyle', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#64748B'))
+    section_heading = ParagraphStyle('SecHeading', parent=styles['Heading2'], fontSize=12, leading=16, textColor=colors.HexColor('#0F172A'), spaceBefore=10, spaceAfter=6)
+    body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#334155'))
+    bold_body = ParagraphStyle('BoldBody', parent=body_style, fontName='Helvetica-Bold')
+
+    elements = []
+
+    # Title Banner
+    elements.append(Paragraph("BINDING SETTLEMENT AGREEMENT", title_style))
+    elements.append(Paragraph("Online Dispute Resolution Platform for Residential Tenancy Deposits", subtitle_style))
+    elements.append(Paragraph("Under the Karnataka Rent Act, 1999 (as amended) & contractual principles", subtitle_style))
+    elements.append(Paragraph("<b>Case ID:</b> ODR-2026-BLR-001", subtitle_style))
+    elements.append(Spacer(1, 10))
+
+    # 1. Parties & Property
+    elements.append(Paragraph("1. Parties & Property", section_heading))
+    p_text = f"<b>Landlord:</b> {landlord_name} | <b>Tenant:</b> {tenant_name}<br/>" \
+             f"<b>Property:</b> {address}<br/>" \
+             f"<b>Monthly Rent:</b> ₹{rent:,.0f} | <b>Occupation:</b> {duration} months"
+    elements.append(Paragraph(p_text, body_style))
+    elements.append(Spacer(1, 10))
+
+    # 2. Financial Summary Table
+    elements.append(Paragraph("2. Financial Summary", section_heading))
+    fin_data = [
+        [Paragraph("<b>Description</b>", bold_body), Paragraph("<b>Amount (₹)</b>", bold_body)],
+        ["Initial Security Deposit Held", f"₹{deposit:,.0f}"],
+        ["Total Approved Deductions", f"₹{approved_deductions:,.0f}"],
+        [Paragraph("<b>FINAL REFUND DUE TO TENANT</b>", bold_body), Paragraph(f"<b>₹{final_refund:,.0f}</b>", bold_body)]
+    ]
+    t_fin = Table(fin_data, colWidths=[380, 160])
+    t_fin.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#0F172A')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+        ('PADDING', (0,0), (-1,-1), 6),
+        ('BACKGROUND', (0,3), (-1,3), colors.HexColor('#E2E8F0'))
+    ]))
+    elements.append(t_fin)
+    elements.append(Spacer(1, 10))
+
+    # 3. Itemised Deduction Decisions Table
+    elements.append(Paragraph("3. Itemised Deduction Decisions", section_heading))
+    
+    p_status = "APPROVED" if allow_painting else "REJECTED"
+    deprec_val = max(0.0, fixture_claim * (1 - (0.10 * fixture_age)))
+    
+    item_data = [
+        [Paragraph("<b>Claim</b>", bold_body), Paragraph("<b>Amount (₹)</b>", bold_body), Paragraph("<b>Decision</b>", bold_body)],
+        ["Painting Charges", f"₹{painting_claim:,.0f}", p_status],
+        ["Fixture / Appliance Damage", f"₹{deprec_val:,.0f}", "APPROVED (Depreciated)"],
+        ["Unpaid Electricity / Utility Bill", f"₹{utility_claim:,.0f}", "APPROVED"]
+    ]
+    t_item = Table(item_data, colWidths=[240, 140, 160])
+    t_item.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+        ('PADDING', (0,0), (-1,-1), 6)
+    ]))
+    elements.append(t_item)
+    elements.append(Spacer(1, 10))
+
+    # 4. Rules Engine Decision Log
+    elements.append(Paragraph("4. Rules Engine Decision Log", section_heading))
+    for log in logs:
+        elements.append(Paragraph(f"• {log}", body_style))
+    elements.append(Spacer(1, 10))
+
+    # 5. Warnings / Notes
+    if deposit > (2 * rent):
+        elements.append(Paragraph("5. Warnings / Notes", section_heading))
+        warn_msg = f"• Collected deposit ₹{deposit:,.0f} exceeds the commonly cited 2-month residential guidance (₹{2*rent:,.0f}). Excess ₹{deposit - (2*rent):,.0f} is noted for transparency only."
+        elements.append(Paragraph(warn_msg, body_style))
+        elements.append(Spacer(1, 10))
+
+    # 6. Binding Effect & Signatures
+    elements.append(Paragraph("6. Binding Effect", section_heading))
+    binding_text = "This document records the outcome of the Online Dispute Resolution process for the security deposit under the tenancy between the parties named above. Both parties acknowledge that the Final Refund figure stated herein constitutes a full and final settlement of all claims relating to the security deposit for the said premises."
+    elements.append(Paragraph(binding_text, body_style))
+    elements.append(Spacer(1, 15))
+
+    sig_data = [
+        [Paragraph("<b>Landlord Acceptance</b>", bold_body), Paragraph("<b>Tenant Acceptance</b>", bold_body)],
+        ["Signature/Digital Acceptance:\n\n_______________________", "Signature/Digital Acceptance:\n\n_______________________"],
+        ["Date:", "Date:"]
+    ]
+    t_sig = Table(sig_data, colWidths=[270, 270])
+    t_sig.setStyle(TableStyle([
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
+        ('PADDING', (0,0), (-1,-1), 6)
+    ]))
+    elements.append(t_sig)
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
 # =========================================================
 # PAGE 1: LANDING / ROLE SELECTION
 # =========================================================
@@ -23,8 +142,6 @@ if st.session_state.page == "home":
     st.divider()
 
     st.subheader("Select portal to begin dispute resolution:")
-    st.write("Both tenant parameters and landlord claims are required to evaluate statutory settlement terms.")
-
     col1, col2 = st.columns(2)
 
     with col1:
@@ -66,8 +183,6 @@ elif st.session_state.page == "tenant":
         st.session_state.deposit = st.number_input("Security Deposit Held (₹)", value=st.session_state.get("deposit", 150000))
         st.session_state.requested_refund = st.number_input("Requested Deposit Refund (₹)", value=st.session_state.get("requested_refund", 142000))
 
-    st.write("")
-    
     if st.button("Save Tenant Data & Proceed →", type="primary"):
         st.session_state.tenant_done = True
         if not st.session_state.landlord_done:
@@ -102,8 +217,6 @@ elif st.session_state.page == "landlord":
 
     st.session_state.landlord_offer = st.number_input("Landlord Refund Offer (₹)", value=st.session_state.get("landlord_offer", 138000))
 
-    st.write("")
-    
     if st.button("Save Landlord Data & Proceed →", type="primary"):
         st.session_state.landlord_done = True
         if not st.session_state.tenant_done:
@@ -122,7 +235,11 @@ elif st.session_state.page == "settlement":
     st.caption("Neutral ODR Engine evaluating submitted tenant and landlord data against statutory rules.")
     st.divider()
 
-    # Retrieve Values from Session State
+    # Retrieve Inputs
+    tenant_name = st.session_state.get("tenant_name", "Rahul Sharma")
+    landlord_name = st.session_state.get("landlord_name", "Suresh Kumar")
+    address = st.session_state.get("address", "Flat 4B, Green Valley Apartments, HSR Layout, Bengaluru")
+    duration = st.session_state.get("duration", 18)
     rent = st.session_state.get("rent", 25000)
     deposit = st.session_state.get("deposit", 150000)
     painting_claim = st.session_state.get("painting_claim", 25000)
@@ -133,52 +250,44 @@ elif st.session_state.page == "settlement":
     landlord_offer = st.session_state.get("landlord_offer", 138000)
     requested_refund = st.session_state.get("requested_refund", 142000)
 
-    # Statutory Rules Calculation Engine
+    # Statutory Engine Logic
     approved_deductions = 0
     logs = []
 
-    # 1. Deposit Cap Evaluation
     guidance_cap = 2 * rent
     if deposit > guidance_cap:
         excess = deposit - guidance_cap
-        logs.append(f"⚠️ Soft warning: deposit exceeds 2× rent guidance by ₹{excess:,.0f}.")
+        logs.append(f"Soft warning: deposit exceeds 2x rent guidance by Rs. {excess:,.0f}.")
 
-    # 2. Painting Deductions
     if allow_painting:
         approved_deductions += painting_claim
-        logs.append(f"✅ 'Painting Charges' (₹{painting_claim:,.0f}) approved based on explicit agreement clause.")
+        logs.append(f"'Painting Charges' (Rs. {painting_claim:,.0f}) allowed agreement + evidence.")
     else:
-        logs.append(f"❌ 'Painting Charges' (₹{painting_claim:,.0f}) rejected: normal wear & tear / routine painting is a landlord expense after reasonable occupancy.")
+        logs.append(f"'Painting Charges' (Rs. {painting_claim:,.0f}) rejected: normal wear & tear.")
 
-    # 3. Fixture Depreciation (10%/yr)
     depreciation_rate = 0.10
     depreciated_fixture = max(0.0, fixture_claim * (1 - (depreciation_rate * fixture_age)))
     approved_deductions += depreciated_fixture
-    logs.append(f"✅ 'Fixture Damage' approved at ₹{depreciated_fixture:,.0f} (Applied 10%/yr depreciation for {fixture_age} year(s) age).")
+    logs.append(f"'Fixture Damage' approved at Rs. {depreciated_fixture:,.0f} (Applied 10%/yr depreciation for {fixture_age} year(s) age).")
 
-    # 4. Utilities
     approved_deductions += utility_claim
-    logs.append(f"✅ 'Unpaid Utility Bill' (₹{utility_claim:,.0f}) approved as unpaid contractual dues.")
+    logs.append(f"'Unpaid Electricity Bill' (Rs. {utility_claim:,.0f}) approved as unpaid contractual dues.")
 
     final_statutory_refund = deposit - approved_deductions
 
-    # Summary Metrics
+    # Dashboard Metrics
     m1, m2, m3 = st.columns(3)
     m1.metric("Initial Deposit", f"₹{deposit:,.0f}")
     m2.metric("Approved Deductions", f"₹{approved_deductions:,.0f}")
     m3.metric("Final Refund Due", f"₹{final_statutory_refund:,.0f}")
 
-    if deposit > guidance_cap:
-        st.warning(f"Collected deposit ₹{deposit:,.0f} exceeds the commonly cited 2-month residential guidance (₹{guidance_cap:,.0f}). Excess ₹{deposit - guidance_cap:,.0f} is noted for transparency only.")
-
-    st.subheader("Rules Engine Decision Logs")
+    st.subheader("4. Rules Engine Decision Log")
     for log in logs:
-        st.write(log)
+        st.write(f"• {log}")
 
     st.divider()
 
-    # Negotiation Gap Analysis
-    st.subheader("3. Structured Negotiation")
+    st.subheader("5. Structured Negotiation")
     c1, c2 = st.columns(2)
     with c1:
         offered = st.number_input("Landlord Refund Offer (₹)", value=float(landlord_offer))
@@ -193,44 +302,29 @@ elif st.session_state.page == "settlement":
     if gap_percent <= 5:
         st.success("🎉 Settlement Reached! Gap is within the ≤ 5% threshold.")
 
-        # Document Generation
-        settlement_text = f"""================================================================================
-                    BINDING SETTLEMENT AGREEMENT & DISPUTE RESOLUTION
-                        (Under Karnataka Rent Act Guidelines)
-================================================================================
-
-DISPUTE ID: SWR-2026-8892
-
-1. PARTIES
-   - Tenant: {st.session_state.get('tenant_name', 'Rahul Sharma')}
-   - Landlord: {st.session_state.get('landlord_name', 'Suresh Kumar')}
-   - Property: {st.session_state.get('address', 'Flat 4B, Green Valley Apartments, HSR Layout, Bengaluru')}
-
-2. FINANCIAL SUMMARY
-   - Initial Security Deposit Held: ₹{deposit:,.2f}
-   - Approved Deductions (Statutory Engine): ₹{approved_deductions:,.2f}
-   - Net Statutory Refund Calculated: ₹{final_statutory_refund:,.2f}
-
-3. AGREED SETTLEMENT TERMS
-   - Landlord Final Offer: ₹{offered:,.2f}
-   - Tenant Final Request: ₹{requested:,.2f}
-   - Negotiated Settlement Gap: ₹{gap:,.2f} ({gap_percent:.2f}% of deposit)
-   - Status: SETTLED & BINDING (Gap within ≤ 5% threshold)
-
-4. DEDUCTION BREAKDOWN & AUDIT LOGS
-   {"\n   ".join(logs)}
-
-================================================================================
-This document serves as an official settlement summary generated by The Deposit
-War Room ODR Platform. Both parties agree to execute the refund as outlined above.
-================================================================================
-"""
+        # Generate Styled PDF Buffer
+        pdf_buffer = generate_pdf_bytes(
+            tenant_name=tenant_name,
+            landlord_name=landlord_name,
+            address=address,
+            rent=rent,
+            deposit=deposit,
+            duration=duration,
+            painting_claim=painting_claim,
+            allow_painting=allow_painting,
+            fixture_claim=fixture_claim,
+            fixture_age=fixture_age,
+            utility_claim=utility_claim,
+            approved_deductions=approved_deductions,
+            final_refund=final_statutory_refund,
+            logs=logs
+        )
 
         st.download_button(
-            label="📄 Auto-Generate Binding Settlement PDF / Document",
-            data=settlement_text,
-            file_name=f"Binding_Settlement_Agreement_{st.session_state.get('tenant_name', 'Tenant')}.txt",
-            mime="text/plain",
+            label="📄 Auto-Generate Binding Settlement PDF",
+            data=pdf_buffer,
+            file_name=f"Binding_Settlement_Agreement_{tenant_name}.pdf",
+            mime="application/pdf",
             type="primary",
             use_container_width=True
         )
