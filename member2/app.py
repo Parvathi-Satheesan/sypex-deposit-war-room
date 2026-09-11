@@ -105,7 +105,7 @@ def generate_pdf_bytes(tenant_name, landlord_name, address, rent, deposit, durat
     elements.append(Spacer(1, 10))
 
     # 5. Warnings / Notes
-    if deposit > (2 * rent):
+    if deposit > (2 * rent) and rent > 0:
         elements.append(Paragraph("5. Warnings / Notes", section_heading))
         warn_msg = f"• Collected deposit ₹{deposit:,.0f} exceeds the commonly cited 2-month residential guidance (₹{2*rent:,.0f}). Excess ₹{deposit - (2*rent):,.0f} is noted for transparency only."
         elements.append(Paragraph(warn_msg, body_style))
@@ -174,14 +174,14 @@ elif st.session_state.page == "tenant":
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("1. Tenancy Intake Information")
-        st.session_state.tenant_name = st.text_input("Tenant Name", value=st.session_state.get("tenant_name", "Rahul Sharma"))
-        st.session_state.address = st.text_input("Property Address", value=st.session_state.get("address", "Flat 4B, Green Valley Apartments, HSR Layout, Bengaluru"))
-        st.session_state.duration = st.number_input("Tenancy Duration (Months)", value=st.session_state.get("duration", 18))
+        st.session_state.tenant_name = st.text_input("Tenant Name", value=st.session_state.get("tenant_name", ""))
+        st.session_state.address = st.text_input("Property Address", value=st.session_state.get("address", ""))
+        st.session_state.duration = st.number_input("Tenancy Duration (Months)", value=st.session_state.get("duration", 0), min_value=0)
     with col2:
         st.subheader("Financial Details")
-        st.session_state.rent = st.number_input("Monthly Rent (₹)", value=st.session_state.get("rent", 25000))
-        st.session_state.deposit = st.number_input("Security Deposit Held (₹)", value=st.session_state.get("deposit", 150000))
-        st.session_state.requested_refund = st.number_input("Requested Deposit Refund (₹)", value=st.session_state.get("requested_refund", 142000))
+        st.session_state.rent = st.number_input("Monthly Rent (₹)", value=st.session_state.get("rent", 0), min_value=0)
+        st.session_state.deposit = st.number_input("Security Deposit Held (₹)", value=st.session_state.get("deposit", 0), min_value=0)
+        st.session_state.requested_refund = st.number_input("Requested Deposit Refund (₹)", value=st.session_state.get("requested_refund", 0), min_value=0)
 
     if st.button("Save Tenant Data & Proceed →", type="primary"):
         st.session_state.tenant_done = True
@@ -201,21 +201,21 @@ elif st.session_state.page == "landlord":
     st.caption("Itemize property damage, maintenance claims, and official refund offers.")
     st.divider()
     
-    st.session_state.landlord_name = st.text_input("Landlord Name", value=st.session_state.get("landlord_name", "Suresh Kumar"))
+    st.session_state.landlord_name = st.text_input("Landlord Name", value=st.session_state.get("landlord_name", ""))
     
     st.subheader("2. Itemised Claims & Evidence Input")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.session_state.painting_claim = st.number_input("Painting Claim Amount (₹)", value=st.session_state.get("painting_claim", 25000))
+        st.session_state.painting_claim = st.number_input("Painting Claim Amount (₹)", value=st.session_state.get("painting_claim", 0), min_value=0)
         st.session_state.allow_painting = st.checkbox("Agreement explicitly allows painting deductions?", value=st.session_state.get("allow_painting", False))
     with col2:
-        st.session_state.fixture_claim = st.number_input("Fixture Claim Amount (₹)", value=st.session_state.get("fixture_claim", 10000))
-        st.session_state.fixture_age = st.number_input("Fixture Age (Years)", value=st.session_state.get("fixture_age", 3.0))
+        st.session_state.fixture_claim = st.number_input("Fixture Claim Amount (₹)", value=st.session_state.get("fixture_claim", 0), min_value=0)
+        st.session_state.fixture_age = st.number_input("Fixture Age (Years)", value=st.session_state.get("fixture_age", 0.0), min_value=0.0)
     with col3:
-        st.session_state.utility_claim = st.number_input("Utility Arrears Amount (₹)", value=st.session_state.get("utility_claim", 4500))
-        st.session_state.evidence_attached = st.checkbox("Evidence Provided?", value=st.session_state.get("evidence_attached", True))
+        st.session_state.utility_claim = st.number_input("Utility Arrears Amount (₹)", value=st.session_state.get("utility_claim", 0), min_value=0)
+        st.session_state.evidence_attached = st.checkbox("Evidence Provided?", value=st.session_state.get("evidence_attached", False))
 
-    st.session_state.landlord_offer = st.number_input("Landlord Refund Offer (₹)", value=st.session_state.get("landlord_offer", 138000))
+    st.session_state.landlord_offer = st.number_input("Landlord Refund Offer (₹)", value=st.session_state.get("landlord_offer", 0), min_value=0)
 
     if st.button("Save Landlord Data & Proceed →", type="primary"):
         st.session_state.landlord_done = True
@@ -236,26 +236,26 @@ elif st.session_state.page == "settlement":
     st.divider()
 
     # Retrieve Inputs
-    tenant_name = st.session_state.get("tenant_name", "Rahul Sharma")
-    landlord_name = st.session_state.get("landlord_name", "Suresh Kumar")
-    address = st.session_state.get("address", "Flat 4B, Green Valley Apartments, HSR Layout, Bengaluru")
-    duration = st.session_state.get("duration", 18)
-    rent = st.session_state.get("rent", 25000)
-    deposit = st.session_state.get("deposit", 150000)
-    painting_claim = st.session_state.get("painting_claim", 25000)
+    tenant_name = st.session_state.get("tenant_name", "N/A")
+    landlord_name = st.session_state.get("landlord_name", "N/A")
+    address = st.session_state.get("address", "N/A")
+    duration = st.session_state.get("duration", 0)
+    rent = st.session_state.get("rent", 0)
+    deposit = st.session_state.get("deposit", 0)
+    painting_claim = st.session_state.get("painting_claim", 0)
     allow_painting = st.session_state.get("allow_painting", False)
-    fixture_claim = st.session_state.get("fixture_claim", 10000)
-    fixture_age = st.session_state.get("fixture_age", 3.0)
-    utility_claim = st.session_state.get("utility_claim", 4500)
-    landlord_offer = st.session_state.get("landlord_offer", 138000)
-    requested_refund = st.session_state.get("requested_refund", 142000)
+    fixture_claim = st.session_state.get("fixture_claim", 0)
+    fixture_age = st.session_state.get("fixture_age", 0.0)
+    utility_claim = st.session_state.get("utility_claim", 0)
+    landlord_offer = st.session_state.get("landlord_offer", 0)
+    requested_refund = st.session_state.get("requested_refund", 0)
 
     # Statutory Engine Logic
     approved_deductions = 0
     logs = []
 
     guidance_cap = 2 * rent
-    if deposit > guidance_cap:
+    if rent > 0 and deposit > guidance_cap:
         excess = deposit - guidance_cap
         logs.append(f"Soft warning: deposit exceeds 2x rent guidance by Rs. {excess:,.0f}.")
 
@@ -299,7 +299,7 @@ elif st.session_state.page == "settlement":
 
     st.info(f"Current Gap: ₹{gap:,.0f} ({gap_percent:.2f}% of total deposit)")
 
-    if gap_percent <= 5:
+    if deposit > 0 and gap_percent <= 5:
         st.success("🎉 Settlement Reached! Gap is within the ≤ 5% threshold.")
 
         # Generate Styled PDF Buffer
@@ -323,10 +323,12 @@ elif st.session_state.page == "settlement":
         st.download_button(
             label="📄 Auto-Generate Binding Settlement PDF",
             data=pdf_buffer,
-            file_name=f"Binding_Settlement_Agreement_{tenant_name}.pdf",
+            file_name=f"Binding_Settlement_Agreement_{tenant_name if tenant_name else 'Document'}.pdf",
             mime="application/pdf",
             type="primary",
             use_container_width=True
         )
+    elif deposit == 0:
+        st.warning("Please enter tenancy parameters to calculate negotiation settlement.")
     else:
         st.error("⚠️ Gap exceeds 5% threshold. Settlement negotiation recommended.")
