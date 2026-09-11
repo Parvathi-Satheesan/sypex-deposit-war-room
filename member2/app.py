@@ -173,7 +173,7 @@ if st.session_state.page == "home":
 elif st.session_state.page == "tenant":
     if st.button("← Back to Landing"):
         navigate_to("home")
-    st.title("👤 Stage 1 & 2: Tenant Intake & Evidence Portal")
+    st.title("Tenant Intake & Evidence Portal")
     st.divider()
 
     c1, c2 = st.columns(2)
@@ -205,7 +205,7 @@ elif st.session_state.page == "tenant":
 elif st.session_state.page == "landlord":
     if st.button("← Back to Landing"):
         navigate_to("home")
-    st.title("🏠 Stage 1 & 2: Landlord Intake & Claims Portal")
+    st.title("Landlord Intake & Claims Portal")
     st.divider()
 
     st.session_state.landlord_name = st.text_input("Landlord Full Name", value=st.session_state.get("landlord_name", ""))
@@ -266,7 +266,7 @@ elif st.session_state.page == "settlement":
     # ---------------------------------------------------------
     # STAGE 3: AUTOMATED STATUTORY CALCULATION ENGINE
     # ---------------------------------------------------------
-    st.subheader("STAGE 3: Automated Karnataka Rent Control Statutory Evaluation")
+    st.subheader("Automated Karnataka Rent Control Statutory Evaluation")
     
     approved_deductions = 0.0
     logs = []
