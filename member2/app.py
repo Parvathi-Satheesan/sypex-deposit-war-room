@@ -114,7 +114,7 @@ elif st.session_state.page == "landlord":
             go_to("settlement")  # Go straight to settlement if both are done
 
 # ---------------------------------------------------------
-# PAGE 4: JOINT SETTLEMENT ENGINE
+# PAGE 4: JOINT SETTLEMENT / DECISION ENGINE
 # ---------------------------------------------------------
 elif st.session_state.page == "settlement":
     if st.button("← Edit Data / Back to Home"):
@@ -124,5 +124,77 @@ elif st.session_state.page == "settlement":
     st.caption("Neutral ODR Engine evaluating submitted tenant and landlord data against statutory rules.")
     st.divider()
 
-    # Access all combined values directly from st.session_state
-    # Place your decision logic, rules logs, metrics, and PDF generator here!
+    # Extract state variables with defaults
+    rent = st.session_state.get("rent", 25000)
+    deposit = st.session_state.get("deposit", 150000)
+    painting_claim = st.session_state.get("painting_claim", 25000)
+    allow_painting = st.session_state.get("allow_painting", False)
+    fixture_claim = st.session_state.get("fixture_claim", 10000)
+    fixture_age = st.session_state.get("fixture_age", 3.0)
+    utility_claim = st.session_state.get("utility_claim", 4500)
+    landlord_offer = st.session_state.get("landlord_offer", 138000)
+    requested_refund = st.session_state.get("requested_refund", 142000)
+
+    # --- Statutory Calculation Logic ---
+    approved_deductions = 0
+    logs = []
+
+    # 1. Deposit Cap Guidance Check
+    guidance_cap = 2 * rent
+    if deposit > guidance_cap:
+        excess = deposit - guidance_cap
+        logs.append(f"⚠️ Soft warning: deposit exceeds 2× rent guidance by ₹{excess:,.0f}.")
+
+    # 2. Painting Claim Evaluation
+    if allow_painting:
+        approved_deductions += painting_claim
+        logs.append(f"✅ 'Painting Charges' (₹{painting_claim:,.0f}) approved based on explicit agreement clause.")
+    else:
+        logs.append(f"❌ 'Painting Charges' (₹{painting_claim:,.0f}) rejected: normal wear & tear / routine painting is a landlord expense after reasonable occupancy.")
+
+    # 3. Fixtures Depreciation Evaluation
+    depreciation_rate = 0.10  # 10% per year
+    depreciated_fixture = max(0.0, fixture_claim * (1 - (depreciation_rate * fixture_age)))
+    approved_deductions += depreciated_fixture
+    logs.append(f"✅ 'Fixture Damage' approved at ₹{depreciated_fixture:,.0f} (Applied 10%/yr depreciation for {fixture_age} year(s) age).")
+
+    # 4. Utilities Claim Evaluation
+    approved_deductions += utility_claim
+    logs.append(f"✅ 'Unpaid Utility Bill' (₹{utility_claim:,.0f}) approved as unpaid contractual dues.")
+
+    # Final Refund Math
+    final_statutory_refund = deposit - approved_deductions
+
+    # --- Visual Display ---
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Initial Deposit", f"₹{deposit:,.0f}")
+    m2.metric("Approved Deductions", f"₹{approved_deductions:,.0f}")
+    m3.metric("Final Refund Due", f"₹{final_statutory_refund:,.0f}")
+
+    if deposit > guidance_cap:
+        st.warning(f"Collected deposit ₹{deposit:,.0f} exceeds the commonly cited 2-month residential guidance (₹{guidance_cap:,.0f}). Excess ₹{deposit - guidance_cap:,.0f} is noted for transparency only.")
+
+    st.subheader("Rules Engine Decision Logs")
+    for log in logs:
+        st.write(log)
+
+    st.divider()
+
+    # --- Section 3: Structured Negotiation ---
+    st.subheader("3. Structured Negotiation")
+    c1, c2 = st.columns(2)
+    with c1:
+        offered = st.number_input("Landlord Refund Offer (₹)", value=float(landlord_offer))
+    with c2:
+        requested = st.number_input("Tenant Requested Refund (₹)", value=float(requested_refund))
+
+    gap = abs(requested - offered)
+    gap_percent = (gap / deposit) * 100 if deposit > 0 else 0
+
+    st.info(f"Current Gap: ₹{gap:,.0f} ({gap_percent:.2f}% of total deposit)")
+
+    if gap_percent <= 5:
+        st.success("🎉 Settlement Reached! Gap is within the ≤ 5% threshold.")
+        st.button("📄 Auto-Generate Binding Settlement PDF", type="primary")
+    else:
+        st.error("⚠️ Gap exceeds 5% threshold. Settlement negotiation recommended.")
