@@ -168,7 +168,7 @@ if st.session_state.page == "home":
     st.divider()
     if st.session_state.tenant_submitted and st.session_state.landlord_submitted:
         st.success("🎉 Both parties have submitted data! You can proceed to statutory calculation & negotiation.")
-        if st.button("Proceed to Engine & Negotiation Room →", type="primary", use_container_width=True):
+        if st.button("Proceed to Negotiation Room →", type="primary", use_container_width=True):
             navigate_to("settlement")
 
 elif st.session_state.page == "tenant":
