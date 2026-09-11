@@ -141,7 +141,7 @@ def generate_settlement_pdf(tenant_name, landlord_name, address, rent, deposit, 
 # STAGE 1 & 2: LANDING & INTAKE PORTALS
 # =========================================================
 if st.session_state.page == "home":
-    st.title("⚖️ Deposit War Room — ODR Platform")
+    st.title("⚖️ SYPex — ODR Platform")
     st.caption("Automated Dispute Resolution Engine compliant with the Karnataka Rent Control Act")
     st.divider()
 
@@ -240,7 +240,7 @@ elif st.session_state.page == "landlord":
 # STAGE 3, 4 & 5: CALCULATIONS, NEGOTIATION & SETTLEMENT
 # =========================================================
 elif st.session_state.page == "settlement":
-    if st.button("← Back to Landing / Edit Intake Data"):
+    if st.button("← Back"):
         navigate_to("home")
 
     st.title("⚖️ ODR Rules Engine & Negotiation War Room")
