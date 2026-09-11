@@ -213,19 +213,19 @@ elif st.session_state.page == "landlord":
     st.subheader("Structured Evidence Entry & Claims")
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown("#### 🎨 Painting Claim")
+        st.markdown("####  Painting Claim")
         st.session_state.painting_claim = st.number_input("Painting Claim (₹)", min_value=0, value=st.session_state.get("painting_claim", 0))
         st.session_state.allow_painting = st.checkbox("Agreement explicitly mandates tenant painting?", value=st.session_state.get("allow_painting", False))
         st.file_uploader("Upload Painting Invoices/Photos", type=["pdf", "png", "jpg"], key="paint_file")
 
     with c2:
-        st.markdown("#### 💡 Fixture & Appliance Damage")
+        st.markdown("####  Fixture & Appliance Damage")
         st.session_state.fixture_claim = st.number_input("Fixture Claim (₹)", min_value=0, value=st.session_state.get("fixture_claim", 0))
         st.session_state.fixture_age = st.number_input("Age of Fixture (Years)", min_value=0.0, value=st.session_state.get("fixture_age", 0.0), step=0.5)
         st.file_uploader("Upload Repair Estimates", type=["pdf", "png", "jpg"], key="fix_file")
 
     with c3:
-        st.markdown("#### 🚰 Utility Arrears")
+        st.markdown("####  Utility Arrears")
         st.session_state.utility_claim = st.number_input("Unpaid Bills (₹)", min_value=0, value=st.session_state.get("utility_claim", 0))
         st.file_uploader("Upload Utility Bills", type=["pdf", "png", "jpg"], key="util_file")
 
@@ -312,7 +312,7 @@ elif st.session_state.page == "settlement":
     # ---------------------------------------------------------
     # STAGE 4: STRUCTURED NEGOTIATION (MAX 3 ROUNDS)
     # ---------------------------------------------------------
-    st.subheader("STAGE 4: Multi-Round Structured Negotiation (Max 3 Rounds)")
+    st.subheader("Multi-Round Structured Negotiation (Max 3 Rounds)")
 
     # Initialize Round 1 if empty
     if len(st.session_state.negotiation_rounds) == 0:
@@ -374,7 +374,7 @@ elif st.session_state.page == "settlement":
     # STAGE 5: SETTLEMENT & DIGITAL SIGNATURES
     # ---------------------------------------------------------
     st.divider()
-    st.subheader("STAGE 5: Binding Settlement & Document Execution")
+    st.subheader("Binding Settlement & Document Execution")
 
     if gap_percent <= 5.0:
         st.success(f"🎉 Dispute Successfully Resolved! Settlement gap is within the allowable threshold ({gap_percent:.2f}% ≤ 5.0%).")
